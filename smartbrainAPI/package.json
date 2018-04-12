@@ -1,0 +1,14 @@
+{
+  "name": "smartbrain_api",
+  "version": "1.0.0",
+  "description": "api for smartbrain web app",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^1.17.3"
+  }
+}

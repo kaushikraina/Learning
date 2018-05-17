@@ -1,6 +1,5 @@
 'use strict';
 
-const safeBuffer = require('safe-buffer');
 const EventEmitter = require('events');
 const crypto = require('crypto');
 const http = require('http');
@@ -10,8 +9,6 @@ const PerMessageDeflate = require('./permessage-deflate');
 const extension = require('./extension');
 const constants = require('./constants');
 const WebSocket = require('./websocket');
-
-const Buffer = safeBuffer.Buffer;
 
 /**
  * Class representing a WebSocket server.
@@ -172,7 +169,7 @@ class WebSocketServer extends EventEmitter {
       !req.headers['sec-websocket-key'] || (version !== 8 && version !== 13) ||
       !this.shouldHandle(req)
     ) {
-      return abortConnection(socket, 400);
+      return abortHandshake(socket, 400);
     }
 
     if (this.options.perMessageDeflate) {
@@ -192,20 +189,8 @@ class WebSocketServer extends EventEmitter {
           extensions[PerMessageDeflate.extensionName] = perMessageDeflate;
         }
       } catch (err) {
-        return abortConnection(socket, 400);
+        return abortHandshake(socket, 400);
       }
-    }
-
-    var protocol = (req.headers['sec-websocket-protocol'] || '').split(/, */);
-
-    //
-    // Optionally call external protocol selection handler.
-    //
-    if (this.options.handleProtocols) {
-      protocol = this.options.handleProtocols(protocol, req);
-      if (protocol === false) return abortConnection(socket, 401);
-    } else {
-      protocol = protocol[0];
     }
 
     //
@@ -220,23 +205,22 @@ class WebSocketServer extends EventEmitter {
 
       if (this.options.verifyClient.length === 2) {
         this.options.verifyClient(info, (verified, code, message) => {
-          if (!verified) return abortConnection(socket, code || 401, message);
+          if (!verified) return abortHandshake(socket, code || 401, message);
 
-          this.completeUpgrade(protocol, extensions, req, socket, head, cb);
+          this.completeUpgrade(extensions, req, socket, head, cb);
         });
         return;
       }
 
-      if (!this.options.verifyClient(info)) return abortConnection(socket, 401);
+      if (!this.options.verifyClient(info)) return abortHandshake(socket, 401);
     }
 
-    this.completeUpgrade(protocol, extensions, req, socket, head, cb);
+    this.completeUpgrade(extensions, req, socket, head, cb);
   }
 
   /**
    * Upgrade the connection to WebSocket.
    *
-   * @param {String} protocol The chosen subprotocol
    * @param {Object} extensions The accepted extensions
    * @param {http.IncomingMessage} req The request object
    * @param {net.Socket} socket The network socket between the server and client
@@ -244,7 +228,7 @@ class WebSocketServer extends EventEmitter {
    * @param {Function} cb Callback
    * @private
    */
-  completeUpgrade (protocol, extensions, req, socket, head, cb) {
+  completeUpgrade (extensions, req, socket, head, cb) {
     //
     // Destroy the socket if the client has already sent a FIN packet.
     //
@@ -262,11 +246,26 @@ class WebSocketServer extends EventEmitter {
     ];
 
     const ws = new WebSocket(null);
+    var protocol = req.headers['sec-websocket-protocol'];
 
     if (protocol) {
-      headers.push(`Sec-WebSocket-Protocol: ${protocol}`);
-      ws.protocol = protocol;
+      protocol = protocol.trim().split(/ *, */);
+
+      //
+      // Optionally call external protocol selection handler.
+      //
+      if (this.options.handleProtocols) {
+        protocol = this.options.handleProtocols(protocol, req);
+      } else {
+        protocol = protocol[0];
+      }
+
+      if (protocol) {
+        headers.push(`Sec-WebSocket-Protocol: ${protocol}`);
+        ws.protocol = protocol;
+      }
     }
+
     if (extensions[PerMessageDeflate.extensionName]) {
       const params = extensions[PerMessageDeflate.extensionName].params;
       const value = extension.format({
@@ -333,7 +332,7 @@ function socketOnError () {
  * @param {String} [message] The HTTP response body
  * @private
  */
-function abortConnection (socket, code, message) {
+function abortHandshake (socket, code, message) {
   if (socket.writable) {
     message = message || http.STATUS_CODES[code];
     socket.write(

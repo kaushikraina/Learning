@@ -1,7 +1,10 @@
 const express = require('express');
 const Blockchain = require('../blockchain/blockchain');
+const Wallet = require('../transaction/wallet.js');
+const transactionPool = require('../transaction/transactionPool.js');
 const bodyParser = require('body-parser');
 const P2pserver = require('./p2pserver');
+
 const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
@@ -16,6 +19,8 @@ difficulty =2;
 
 const bc = new Blockchain();
 const p2pServer=new P2pserver(bc);
+const tPool= new transactionPool();
+const wallet = new Wallet();
 
 
 
@@ -23,6 +28,19 @@ app.get('/blocks',(req , res)=>{
   res.json(bc.chain);
 
 });
+
+app.get('/transactions',(req , res)=>{
+  res.json(tPool.transacPool);
+
+});
+
+app.post('/transacted',(req , res)=>{
+	  
+ const { recipient, amount } = req.body;
+ const transaction= wallet.createTransaction(recipient,amount,tPool);
+
+  res.redirect('/transactions');  
+  });
 
 app.post('/mine',(req , res)=>{
 	  console.log(req.body);

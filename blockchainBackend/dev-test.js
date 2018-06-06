@@ -1,7 +1,5 @@
-const Block = require('../blockchain/block');
+const Wallet = require('./transaction/wallet');
 
-const block = new Block("hello","how","are","you");
+const wallet = new Wallet();
 
-console.log(block.toString());
-console.log(Block.genesis());
-console.log(Block.mineBlock(block,"data"));
+console.log(wallet.toString());

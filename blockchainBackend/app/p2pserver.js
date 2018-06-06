@@ -1,4 +1,9 @@
 
+
+// implement transaction pool PTP 
+// implement incoming message for transactions
+
+
 const WebSocket =require('ws');
 const Blockchain =require('../blockchain/blockchain.js');
 
